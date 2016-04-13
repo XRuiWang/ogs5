@@ -270,6 +270,7 @@ private:
 	// 25.2.2007.WW  SymMatrix *GravityMatrix;
 	// Gauss point value. Buffers. // Some changes. 27.2.2007 WW
 	double TG, TG0, PG, PG0, PG2, PG20, drho_gw_dT;
+        double TGn, PGW, drho_air_dT; //thermal expansion of gas 04.2013 XW 
 	double Sw, rhow, poro, dSdp;
 	double rho_gw, rho_ga, rho_g, p_gw, M_g, tort, Xw, eos_arg[5], heat_capacity, heat_conductivity, viscosity;
 
@@ -297,6 +298,10 @@ public:
 
 protected:
 	//
+	double Tdepenwrcs();
+	//XW 082014
+	double Tdepensm();
+	//XW 102014
 	double CalCoefMass();
 	// 25.2.2007 WW
 	double CalCoefMass2(int dof_index);
@@ -334,6 +339,8 @@ protected:
 	double CalCoef_RHS_T_MPhase(int dof_index);
 	double CalCoef_RHS_TNEQ(const int dof_index);
 	double CalCoef_RHS_TES(const int dof_index);
+	//XW 24.04.2013
+	double CalCoef_RHS_T_Mexpansion (int dof_index); 
 	// 27.2.2007 WW
 	double CalCoef_RHS_M_MPhase(int dof_index);
 	double CalCoef_RHS_PSGLOBAL(int dof_index);
@@ -394,6 +401,8 @@ protected:
 	void Assemble_Gravity_Multiphase();
 	// Assembly of RHS by temperature for m-phase flow 27.2.2007 WW
 	void Assemble_RHS_T_MPhaseFlow();
+	// Assembly of RHS including thermal expansion of gas and liquid for m-phase flow 02.2016 XW
+	void Assemble_RHS_T_Mexpansion();     
 	// Assembly of RHS by deformation. 27.2.2007 WW
 	void Assemble_RHS_M();
 	void Assemble_RHS_Pc(); // 03.2009 PCH

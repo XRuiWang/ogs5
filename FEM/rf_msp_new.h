@@ -184,6 +184,7 @@ private:
 	int mode; // CMCD
 	// Swelling pressure
 	int SwellingPressureType;
+	double SwellingCof;  //XW 06.2013
 	double Max_SwellingPressure;
 	//
 	std::string CurveVariable_Conductivity;

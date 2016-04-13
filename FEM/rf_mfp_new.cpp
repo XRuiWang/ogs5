@@ -94,6 +94,7 @@ CFluidProperties::CFluidProperties() : name("WATER")
 	Z = 1.;
 	cal_gravity = true;
 	drho_dT_unsaturated = false; // considering fluid expansion due to temperature in the unsaturated case? (Richards)
+	drohw_dT_multi = false;// XW considerering thermal expansion of fluid in Multiphase_Flow
 	// Data
 	mode = 0; // Gauss point values
 	Fem_Ele_Std = NULL;
@@ -271,6 +272,11 @@ std::ios::pos_type CFluidProperties::Read(std::ifstream* mfp_file)
 			drho_dT_unsaturated = true; // if keyword found, drho/dT will be considered for unsaturated case (richards)
 			continue;
 		}
+		if(line_string.find("$DRHOW_DT_Multi") != string::npos)  //XW considering water expansion in multiphase flow
+		{
+			drohw_dT_multi = true; 
+			continue;
+		}
 		//....................................................................
 		// subkeyword found
 		if (line_string.find("$DENSITY") != string::npos)
@@ -401,6 +407,11 @@ std::ios::pos_type CFluidProperties::Read(std::ifstream* mfp_file)
 				density_pcs_name_vector.push_back("TEMPERATURE1");
 				density_pcs_name_vector.push_back("CONCENTRATION1");
 			}
+			if(density_model == 21) // XW add curve for density
+			{	
+				in >> curvnr;
+			density_pcs_name_vector.push_back("TEMPERATURE1");
+			}
 			if (density_model == 26) // && pcs_vector[0]->getProcessType() != FiniteElement::TNEQ)
 			{
 				std::cout << "Warning: This density model requires two components and their molar masses defined in "
@@ -410,6 +421,31 @@ std::ios::pos_type CFluidProperties::Read(std::ifstream* mfp_file)
 				density_pcs_name_vector.push_back("CONCENTRATION1");
 			}
 			//      mfp_file->ignore(MAX_ZEILE,'\n');
+			in.clear();
+			continue;
+		}
+		if(line_string.find("$WTHERMALEXPANSION") != string::npos) // XW 06.2013 FUNKTION alphaW-f(T)
+		{
+			in.str(GetLineFromFile1(mfp_file));
+			in >> thermalexpansion_model;
+			if (thermalexpansion_model == 0)
+			{
+				in >> therm_ex_curv_nr;
+			}
+
+			if (thermalexpansion_model == 1)
+			{
+				in >> drho_dT;
+			}
+			if (thermalexpansion_model == 2)
+			{
+				in >> a2;
+				in >> a3;
+				in >> a4;
+				in >> a5;
+				in >> a6;
+				in >> a7;
+			}
 			in.clear();
 			continue;
 		}
@@ -500,6 +536,11 @@ std::ios::pos_type CFluidProperties::Read(std::ifstream* mfp_file)
 			/// Viscosity model no. 19: Extracts viscosities from GEM3K calculations (not yet implemented)
 			if (viscosity_model == 19) // KG44 extract viscosity from GEMS
 			{
+			}
+			if(viscosity_model == 21) //XW T dependent viscosity for Decovalex FEe
+			{
+				in >> my_a;
+				in >> my_b;
 			}
 			if (viscosity_model == 26) // && pcs_vector[0]->getProcessType() != FiniteElement::TNEQ)
 			{
@@ -1083,6 +1124,10 @@ double CFluidProperties::Density(double* variables)
 					density *= 1. + drho_dC * (max(variables[2], 0.0) - C_0);
 
 				break;
+			case 21:                   //XW rho=f(T)
+				density = GetCurveValue(curvnr,0,variables[1],&gueltig);
+
+				break;
 			case 26: // Dalton's law + ideal gas for use with TNEQ/TES
 			{
 				const double M0 = cp_vec[0]->molar_mass; // molar mass of component 0
@@ -1246,6 +1291,9 @@ double CFluidProperties::Density(double* variables)
 				if (fabs(drho_dC) > 1.e-20)
 					density *= 1. + drho_dC * (max(primary_variable[2], 0.0) - C_0);
 				break;
+			case 21:                   //XW rho=f(T)
+				density = GetCurveValue(curvnr,0,primary_variable[0],&gueltig);
+				break;
 			default:
 				std::cout << "Error in CFluidProperties::Density: no valid model"
 				          << "\n";
@@ -1254,7 +1302,31 @@ double CFluidProperties::Density(double* variables)
 	}
 	return density;
 }
-
+///////////////////////////////////////////////////////////////////////////
+//Water thermal expansion
+/**************************************************************************
+   Task: calc water thermalExpansion´s coefficient als funktion of temperature
+   Programing:
+   XW 06/2013
+**************************************************************************/
+double CFluidProperties::WaterThermExpansion (double T)
+{
+	int gueltig;
+	//double drhw_dT = 0.0;
+	 switch(thermalexpansion_model)
+	 {
+	 case 0: //Curve
+         drhw_dT = GetCurveValue((int)therm_ex_curv_nr,0,T,&gueltig);
+		 break;
+	 case 1://constant
+		 drhw_dT = drho_dT;
+		 break;
+	 case 2: //Funktion
+         drhw_dT = a1 * pow(T, 6.0) + a2 * pow(T, 5.0) + a3 * pow(T, 4.0)+ a4 * pow(T, 3.0) + a5 * pow(T, 2.0) + a6 * T + a7;
+		 break;
+	 }
+	 return drhw_dT;
+}
 /*-------------------------------------------------------------------------
    GeoSys - Function: GetElementValueFromNodes
    Task: Interpolates node values like density or viscosity to the elements (if GPIndex < 0) or to element gauss points
@@ -1582,7 +1654,8 @@ double CFluidProperties::Viscosity(double* variables)
 			// viscosity = LiquidViscosity_Marsily_1986(primary_variable[0]);
 			break;
 		case 5: // my^g(p,T), Reichenberg (1971)
-			viscosity = GasViscosity_Reichenberg_1971(primary_variable[0], primary_variable[1]);
+			//viscosity = GasViscosity_Reichenberg_1971(primary_variable[0], primary_variable[1]); XW del
+			viscosity = GasViscosity_Reichenberg_1971(max(primary_variable[0],0.0),primary_variable[1] +CelsiusZeroInKelvin); //XW avoid negtiv Pressure grad to kelvin
 			break;
 		case 6: // my(C,T),
 			viscosity = LiquidViscosity_NN(primary_variable[0], primary_variable[1]);
@@ -1638,6 +1711,9 @@ double CFluidProperties::Viscosity(double* variables)
 			break;
 		case 19: // reserved for GEMS coupling
 			break;
+		case 21: // XW my=A*exp(B/T(in kelvin)
+		    viscosity = my_a * exp (my_b / (primary_variable[1]+ CelsiusZeroInKelvin));
+		    break;
 		case 26: // Wilke (see Poling, B. E.; Prausnitz, J. M.; John Paul, O. & Reid, R. C. The properties of gases and
 			// liquids McGraw-Hill New York, 2001, 5: page 9.21)
 			{
@@ -3537,21 +3613,26 @@ double MFPGetNodeValue(long node, const string& mfp_name, int phase_number)
 
 	//......................................................................
 	double mfp_value = .0;
+	double * const args = &arguments[0]; //XW_test add for old compile
 	switch (mfp_id)
 	{
 		case 0:
-			mfp_value = m_mfp->Viscosity(arguments.data());
+			//mfp_value = m_mfp->Viscosity(arguments.data()); XW_del
+			mfp_value = m_mfp->Viscosity(args); //XW
 			break;
 		// NB 4.8.01
 		case 1:
-			mfp_value = m_mfp->Density(arguments.data());
+			//mfp_value = m_mfp->Density(arguments.data()); XW_del
+			mfp_value = m_mfp->Density(args);//XW
 			break;
 		case 2:
-			mfp_value = m_mfp->HeatConductivity(arguments.data());
+			//mfp_value = m_mfp->HeatConductivity(arguments.data()); XW_del
+			mfp_value = m_mfp->HeatConductivity(args);//XW
 			break;
 		// NB AUG 2009
 		case 3:
-			mfp_value = m_mfp->SpecificHeatCapacity(arguments.data());
+			//mfp_value = m_mfp->SpecificHeatCapacity(arguments.data()); XW_del
+			mfp_value = m_mfp->SpecificHeatCapacity(args);//XW
 			break;
 		default:
 			cout << "MFPGetNodeValue: no MFP data"

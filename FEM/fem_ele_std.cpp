@@ -1483,6 +1483,55 @@ void CFiniteElementStd::CalNodalEnthalpy()
 
 /**************************************************************************
    FEMLib-Method:
+   Task: Calculate coefficient for temperature dependent water retention curve
+   Programing:
+   08/2014 XW
+**************************************************************************/
+double CFiniteElementStd::Tdepenwrcs()
+{
+
+	double Taku, valueM, deltT; 
+	//long node;
+	//Taku = pcs->GetNodeValue(nodes,pcs->GetNodeValueIndex(
+			                                   // "TEMPERATURE1") + 1);
+	Taku = interpolate(NodalValC1);
+	deltT=Taku-(MediaProp->Tini);
+	if (deltT>1e3||deltT<-1e3)
+		deltT=0;
+	switch(MediaProp->twrcs_model)
+	{
+		case 1:                   // rho = f(x)
+			valueM =(MediaProp->wrcs_coefficient)*deltT;
+			break;
+	}
+	return valueM;
+}
+
+/**************************************************************************
+   FEMLib-Method:
+   Task: Calculate coefficient for temperature dependent water retention curve
+   Programing:
+   08/2014 XW
+**************************************************************************/
+double CFiniteElementStd::Tdepensm()
+{
+
+	double Taku, valueSres, deltT; 
+	//long node;
+	//Taku = pcs->GetNodeValue(nodes,pcs->GetNodeValueIndex(
+			                                   // "TEMPERATURE1") + 1);
+	Taku = interpolate(NodalValC1);
+	deltT=Taku-(MediaProp->Tini);
+	if (deltT>1e3||deltT<-1e3)
+		deltT=0;
+	valueSres =(MediaProp->sm_coefficient)*deltT;
+	//if (value<-0.3)
+		//value=-0.3;
+	return valueSres;
+}
+
+/**************************************************************************
+   FEMLib-Method:
    Task: Calculate material coefficient for mass matrix
    Programing:
    01/2005 WW/OK Implementation
@@ -2400,7 +2449,8 @@ void CFiniteElementStd::CalCoefLaplace(bool Gravity, int ip)
 					mat[i * dim + i] = SolidProp->Heat_Conductivity(TG);
 			}
 			// DECOVALEX THM1 or Curce 12.09. WW
-			else if (SolidProp->GetConductModel() % 3 == 0 || SolidProp->GetConductModel() == 4)
+			//else if (SolidProp->GetConductModel() % 3 == 0 || SolidProp->GetConductModel() == 4) XW del
+				else if(SolidProp->GetConductModel()%3 == 0 || SolidProp->GetConductModel() == 4|| SolidProp->GetConductModel() == 25 || SolidProp->GetConductModel() == 26)//XW add case 25/26 for temperature dependent thermal conductivity
 			{
 				// WW
 				PG = interpolate(NodalValC1);
@@ -2505,9 +2555,11 @@ void CFiniteElementStd::CalCoefLaplace(bool Gravity, int ip)
 			tensor = MediaProp->PermeabilityTensor(Index);
 
 			if (MediaProp->unconfined_flow_group == 2) // 3D unconfined GW JOD, 5.3.07
-				mat_fac = time_unit_factor * MediaProp->PermeabilitySaturationFunction(-PG, 0) / FluidProp->Viscosity();
+				//mat_fac = time_unit_factor * MediaProp->PermeabilitySaturationFunction(-PG, 0) / FluidProp->Viscosity(); XW_del
+				mat_fac = time_unit_factor * MediaProp->PermeabilitySaturationFunction(-PG, 0) / FluidProp->Viscosity(variables); //XW Viscosity in abhaengigkeit von P und T
 			else
-				mat_fac = time_unit_factor * MediaProp->PermeabilitySaturationFunction(Sw, 0) / FluidProp->Viscosity();
+				//mat_fac = time_unit_factor * MediaProp->PermeabilitySaturationFunction(Sw, 0) / FluidProp->Viscosity(); XW_del
+				mat_fac = time_unit_factor * MediaProp->PermeabilitySaturationFunction(Sw, 0) / FluidProp->Viscosity(variables);//XW Viscosity in abhaengigkeit von P und T
 			// Modified LBNL model WW
 			if (MediaProp->permeability_stress_mode > 1)
 			{
@@ -2675,11 +2727,14 @@ void CFiniteElementStd::CalCoefLaplace2(bool Gravity, int dof_index)
 	PG = interpolate(NodalVal1);
 	PG2 = interpolate(NodalVal_p2);
 	// WX: cal factor for permeability 11.05.2010
+	double PGW = PG2-PG; //XW 022016 add water pressure dependent perm
 	CFiniteElementStd* h_fem;
 	h_fem = this;
 
-	if (MediaProp->permeability_pressure_model > 0) // 01.09.2011. WW
+	if(MediaProp->permeability_pressure_model > 0 && MediaProp->permeability_pressure_model != 9) //01.09.2011. WW//XW 022016 add water pressure dependent perm
 		fac_perm = MediaProp->PermeabilityFunctionPressure(Index, PG2);
+	if(MediaProp->permeability_pressure_model == 9) //XW 022016 add water pressure dependent perm
+		fac_perm = MediaProp->PermeabilityFunctionPressure(Index, PGW);
 	if (MediaProp->permeability_strain_model > 0) // 01.09.2011. WW
 		fac_perm *= MediaProp->PermeabilityFunctionStrain(Index, nnodes, h_fem);
 	//======================================================================
@@ -9044,6 +9099,10 @@ void CFiniteElementStd::Assembly()
 			Assemble_Gravity();
 			if (cpl_pcs && MediaProp->heat_diffusion_model == 1)
 				Assemble_RHS_T_MPhaseFlow();
+			else // XW 
+			//if (isTemperatureCoupling())
+			if (isTemperatureCoupling() && FluidProp->drohw_dT_multi)	//XW made it possible to consider thermal expansion of liquid phase without consideration of vapour diffusion 					
+						Assemble_RHS_T_Mexpansion(); //XW 02.2016
 			if (dm_pcs)
 				Assemble_RHS_M();
 			if (pcs->m_num->nls_method == 1) // Newton-Raphson. 06.2011. WW
@@ -10326,6 +10385,94 @@ void CFiniteElementStd::Assemble_RHS_T_MPhaseFlow()
 	//
 }
 /***************************************************************************
+   GeoSys - Funktion:
+          Assemble_RHS_T_MPhaseFlow_add_thermal expansion of liquid and gas 
+   Programming:
+   02/2016   XW
+ **************************************************************************/
+void CFiniteElementStd::Assemble_RHS_T_Mexpansion()
+{
+	int i, j, ii;
+	// ---- Gauss integral
+	int gp_r = 0,gp_s = 0,gp_t = 0;
+	double fkt, fac;
+	// Material
+	int dof_n = 2;
+	//----------------------------------------------------------------------
+	for (i = 0; i < dof_n * nnodes; i++)
+		NodalVal[i] = 0.0;
+	//======================================================================
+	// Loop over Gauss points
+	for (gp = 0; gp < nGaussPoints; gp++)
+	{
+		//---------------------------------------------------------
+		//  Get local coordinates and weights
+		//  Compute Jacobian matrix and its determinate
+		//---------------------------------------------------------
+		fkt = GetGaussData(gp, gp_r, gp_s, gp_t);
+		// Compute geometry
+		ComputeGradShapefct(1);   // Linear interpolation function
+		ComputeShapefct(1);       // Linear interpolation function
+		for(ii = 0; ii < dof_n; ii++)
+		{
+			// Material
+			fac = fkt * CalCoef_RHS_T_Mexpansion(ii) / dt;
+			// Calculate THS
+#if defined(USE_PETSC) //|| defined (other parallel solver) //WW 04.2014
+			for (int ia = 0; ia < act_nodes; ia++)
+	        {
+			    const int i = local_idx[ia];
+#else
+			for (i = 0; i < nnodes; i++)
+			{
+#endif
+				NodalVal[i + ii * nnodes] += fac * shapefct[i];
+			}
+		}
+		// grad T
+		for(ii = 0; ii < dof_n; ii++)
+		{
+			// Material
+			fac = fkt * CalCoef_RHS_T_Mexpansion(ii + dof_n);
+			// Calculate THS
+#if defined(USE_PETSC) //|| defined (other parallel solver) //WW 04.2014
+			for (int ia = 0; ia < act_nodes; ia++)
+	        {
+			    const int i = local_idx[ia];
+#else
+			for (i = 0; i < nnodes; i++)
+			{
+#endif
+				for (j = 0; j < nnodes; j++)
+					for (size_t k = 0; k < dim; k++)
+						NodalVal[i + ii * nnodes] +=
+						        fac *
+						        dshapefct[k * nnodes +
+						                  i] * dshapefct[k * nnodes + j]
+						        * (NodalValC1[j] + PhysicalConstant::CelsiusZeroInKelvin);
+			}			        
+		}
+	}
+#if !defined(USE_PETSC) // && !defined(other parallel libs)//03~04.3012. WW
+	int dm_shift = 0;
+	if(pcs->type / 10 == 4)
+		dm_shift = problem_dimension_dm;
+#endif
+	for(ii = 0; ii < 2; ii++)
+	{
+		int ii_sh = ii * nnodes;
+		for (i = 0; i < nnodes; i++)
+		{
+#if !defined(USE_PETSC) // && !defined(other parallel libs)//03~04.3012. WW
+			int i_sh = NodeShift[ii + dm_shift];
+			eqs_rhs[i_sh + eqs_number[i]] -= NodalVal[i + ii_sh];
+#endif
+			(*RHS)[i + LocalShift + ii_sh] -=  NodalVal[i + ii_sh];
+		}
+	}
+	//
+}
+/***************************************************************************
    GeoSys - Function: Assemble_RHS_T_PSGlobal
    Programming:
    09/2009
@@ -10481,7 +10628,7 @@ void CFiniteElementStd::Assemble_RHS_LIQUIDFLOW()
 	if (!isTemperatureCoupling())
 		return;
 	if ((FluidProp->drho_dT == .0 && (FluidProp->density_model < 8 || FluidProp->density_model > 14))
-	    && SolidProp->Thermal_Expansion() == .0)
+	    && SolidProp->Thermal_Expansion() == .0 && FluidProp->density_model!=21) // XW add dens21
 		return;
 
 	//----------------------------------------------------------------------
@@ -10521,6 +10668,8 @@ void CFiniteElementStd::Assemble_RHS_LIQUIDFLOW()
 			arg[1] = interpolate(NodalValC1); // T
 			alpha_T_l = -FluidProp->drhodT(arg) / FluidProp->Density();
 		}
+		else if(FluidProp->density_model==21)// XW add density model 21
+			alpha_T_l = - FluidProp->WaterThermExpansion(T_n);//XW for T depend thermal expansion
 		else
 			alpha_T_l = -FluidProp->drho_dT; // negative sign is required due to OGS input
 
@@ -10540,7 +10689,12 @@ void CFiniteElementStd::Assemble_RHS_LIQUIDFLOW()
 		//---------------------------------------------------------
 		//  Compute RHS+=int{N^T alpha_T dT/dt}
 		//---------------------------------------------------------
-		const double fac = eff_thermal_expansion * dT / dt / time_unit_factor; // WX:bug fixed
+		double fac = 0;//XW 04.2013
+		if(PcsType==EPT_RICHARDS_FLOW)
+			fac = eff_thermal_expansion * dT / dt;//XW for Richardsflow 
+		else
+		//const double fac = eff_thermal_expansion * dT / dt / time_unit_factor; // WX:bug fixed XW_del 
+		fac = eff_thermal_expansion * dT / dt / time_unit_factor;// XW 
 #if defined(USE_PETSC) //|| defined (other parallel solver) //WW 04.2014
 		for (int ia = 0; ia < act_nodes; ia++)
 		{
@@ -11068,7 +11222,106 @@ double CFiniteElementStd::CalCoef_RHS_M_MPhase(int dof_index)
 	}
 	return val;
 }
+/**************************************************************************
+  FEMLib-Method:
+   Task: Calculate  thermal expansion induced RHS of multi-phase
+      flow
+   Programing:
+   04/2013 XW Implementation
+   last modification:
+**************************************************************************/
+double CFiniteElementStd::CalCoef_RHS_T_Mexpansion(int dof_index)
+{
+	double val = 0.0, D_gw = 0.0, D_ga = 0.0;
+	double expfactor = 0.0,dens_arg[3];
+	int Index = MeshElement->GetIndex();
+	ComputeShapefct(1);
+	//======================================================================
+	const double Mw = MolarMass::Water;
+	switch(dof_index)
+	{
+	case 0:
+		PG = interpolate(NodalVal1);
+		Sw = MediaProp->SaturationCapillaryPressureFunction(PG);
+		TG = interpolate(NodalValC1) + PhysicalConstant::CelsiusZeroInKelvin;
+		TG0 = interpolate(NodalValC) + PhysicalConstant::CelsiusZeroInKelvin;
+		TGn = interpolate(NodalValC1);//XW 06.2013
+		PG2 = interpolate(NodalVal_p2);
+		rhow = FluidProp->Density();
+		poro = MediaProp->Porosity(Index,pcs->m_num->ls_theta);
+		expfactor = 1.0 / (rhow * SpecificGasConstant::WaterVapour * TG);
+		rho_gw = FluidProp->vaporDensity(TG) * exp(-PG * expfactor);
+		//
+		drho_gw_dT = (FluidProp->vaporDensity_derivative(TG)
+		              + PG * expfactor * FluidProp->vaporDensity(TG) / TG) * exp(
+		        -PG * expfactor);
+		val = (1. - Sw) * poro * drho_gw_dT / rhow;
+		if(FluidProp->density_model == 4)//XW add water droh/dT
+			val+= poro * Sw * FluidProp->drho_dT; //XW water thermal expansion
+		if(FluidProp->density_model == 21)// XW add T dependent thermal expansion coeffcient
+			val+= poro * Sw * FluidProp->WaterThermExpansion(TGn);// XW 06.2013 variate water thermal expansion
+		//
+		if(SolidProp)
+			//val -=
+			       // (1.0 -
+			         //poro) *
+			        //((1 - Sw) * rho_gw / rhow + Sw) * SolidProp->Thermal_Expansion(); XW dele solid_thermal should *3
+		//
+		 val -=
+			        (SolidProp->biot_const-poro) *
+			        ((1 - Sw) * rho_gw / rhow + Sw) * 3 * SolidProp->Thermal_Expansion();//XW (3*Thermal?)
+		//
+		// val += n*(1.0-rho_gw/rhow)*(dSw/dT)
+		val *= (TG - TG0);
+		break;
+	case 1:
+		//
+		if(GasProp->density_model == 4 || GasProp->density_model == 6 ) //XW roh vs.T
+			drho_air_dT = GasProp->drho_dT ; //XW roh vs.T
+		else
+			//drho_air_dT=-1 * GasProp->molar_mass * PG2 / TG / TG / GAS_CONSTANT ; //XW thermal expansion_coefficient of gas 
+			drho_air_dT=-1 * GasProp->molar_mass * PG2 / TG / TG /PhysicalConstant::IdealGasConstant;
+		//val = -(1. - Sw) * poro * drho_gw_dT / rhow; XW dele maybe wrong
+		 val = (1. - Sw) * poro * drho_air_dT / rhow; //XW (+,-??)
+		//
+		if(SolidProp)
+			//val -=
+			     //   (1.0 -
+			     //    poro) * (1 - Sw) * rho_ga * SolidProp->Thermal_Expansion() / rhow; //XW (3*Thermal?) del
+		    val -= (SolidProp->biot_const-poro)  * (1 - Sw) * rho_ga * 3 * SolidProp->Thermal_Expansion() / rhow;//XW 3*Thermal test pure gas_thermal_expansion (- or +)
+		//
+		// val -= n*rho_ga/rhow)*(dSw/dT)
+		//---------------------------------------------------------------
+		val *= (TG - TG0);
+		break;
+	case 2:
+		//------------------------------------------------------------------------
+		// From grad (p_gw/p_g)
+		tort = MediaProp->TortuosityFunction(Index,unit,pcs->m_num->ls_theta);
+		tort *= MediaProp->base_heat_diffusion_coefficient * (1 - Sw) * poro
+				* pow(TG / PhysicalConstant::CelsiusZeroInKelvin, 1.8);
+		p_gw = rho_gw * SpecificGasConstant::WaterVapour * TG;
+		dens_arg[0] = PG2 - p_gw;
+		dens_arg[1] = TG;
+		rho_ga = GasProp->Density(dens_arg); //AKS SEP 2010  //(PG2-p_gw)*GasProp->molar_mass/(FluidConstant::GasConstant()*TG);
+		rho_g = rho_ga + rho_gw;
+		// 1/Mg
+		M_g = (rho_gw / Mw + rho_ga / GasProp->molar_mass) / rho_g;
+		D_gw = tort * rho_g * Mw * GasProp->molar_mass * M_g * M_g / rhow;
+		val = D_gw * drho_gw_dT * SpecificGasConstant::WaterVapour * TG / PG2 * time_unit_factor;
+		break;
+	case 3:
+		//---------------------------------------------------------------
+		//
+		D_ga = tort * rho_g * Mw * GasProp->molar_mass * M_g * M_g / rhow;
+		// From grad (p_gw/p_g)
+		val = -D_ga * drho_gw_dT * SpecificGasConstant::WaterVapour * TG / PG2 * time_unit_factor;
 
+		break;
+		//------------------------------------------------------------------
+	}
+	return val;
+}
 /**************************************************************************
    PCSLib-Method:
    01/2007 OK Implementation

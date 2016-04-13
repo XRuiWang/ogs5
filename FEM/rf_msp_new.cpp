@@ -132,6 +132,12 @@ std::ios::pos_type CSolidProperties::Read(std::ifstream* msp_file)
 						in_sd >> (*data_Youngs)(0) >> (*data_Youngs)(1) >> (*data_Youngs)(2);
 					in_sd.clear();
 				}
+				else if (SwellingPressureType == 5)//XW add volumetric Swellingstrain  06.2013 input linear_Swellingcoeffcient =1/3*Volumentric
+				{
+					in_sd >> SwellingCof;
+					//in_sd >> AnisoCof; 
+					in_sd.clear();
+				}
 				else
 				{
 					std::cout << "No multi-phase flow coupled. The thermal elatic model can only be used in H2 coupled "
@@ -312,6 +318,22 @@ std::ios::pos_type CSolidProperties::Read(std::ifstream* msp_file)
 					in_sd.clear();
 					conductivity_pcs_name_vector.push_back("TEMPERATURE1");
 					conductivity_pcs_name_vector.push_back("SATURATION1");
+					break;
+				case 25:       //  XW DECOVALEX FEe1D, Clay	0. Wet conductivity 1. Dry conductivity
+					data_Conductivity = new Matrix(2);
+					for(i = 0; i < 2; i++)
+					in_sd >> (*data_Conductivity)(i);
+					in_sd.clear();
+					capacity_pcs_name_vector.push_back("TEMPERATURE1");
+					capacity_pcs_name_vector.push_back("SATURATION1");
+					break;
+				case 26:       //  XW DECOVALEX FEe1D, Beton	0. Wet conductivity 1. Dry conductivity
+					data_Conductivity = new Matrix(2);
+					for(i = 0; i < 2; i++)
+					in_sd >> (*data_Conductivity)(i);
+					in_sd.clear();
+					capacity_pcs_name_vector.push_back("TEMPERATURE1");
+					capacity_pcs_name_vector.push_back("SATURATION1");
 					break;
 			}
 			in_sd.clear();
@@ -1415,6 +1437,12 @@ double CSolidProperties::Heat_Conductivity(double refence)
 			CalPrimaryVariable(capacity_pcs_name_vector);
 			val = GetMatrixValue(primary_variable[0] + T_0, primary_variable[1], name, &gueltig);
 			break;
+		case 25:   //XW DECOVALEX FE 1D clay
+			val = (*data_Conductivity)(0) * sqrt(refence) + (*data_Conductivity)(1) * (1 - sqrt(refence)); 
+			break;
+		case 26:                               //XW DECOVALEX FE 1D BETON
+			val = pow((*data_Conductivity)(0), refence) * pow((*data_Conductivity)(1), (1 - refence)); 
+			break;
 	}
 	return val;
 }
@@ -1469,6 +1497,14 @@ void CSolidProperties::HeatConductivityTensor(const int dim, double* tensor, int
 			break;
 		case 5:
 			base_thermal_conductivity = GetMatrixValue(primary_variable[1], primary_variable[0] + T_0, name, &gueltig);
+			break;
+		case 25:                               // XW DECOVALEX FEe1D, CLAY
+			saturation = primary_variable[1];
+			base_thermal_conductivity = Heat_Conductivity(saturation);
+			break;
+		case 26:                               // XW DECOVALEX FEe1D, Beton
+			saturation = primary_variable[1];
+			base_thermal_conductivity = Heat_Conductivity(saturation);
 			break;
 		default: // Normal case
 			cout << "***Error in CSolidProperties::HeatConductivityTensor(): conductivity mode is not supported "

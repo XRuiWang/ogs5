@@ -253,6 +253,7 @@ public:
 	double permeability_porosity_model_values[10];
 	double storativity;
 	double capillary_pressure_values[5]; // JT2012
+	int twrcs_model; //XW 082014
 	double heat_capacity; // thermal properties
 	int mass_dispersion_model;
 	double mass_dispersion_longitudinal;
@@ -280,6 +281,12 @@ public:
 	double overland_width, rill_height, rill_epsilon;
 	bool channel;
 	double argument; // OK
+	//parameter for T dependent WRCS XW 082014
+	bool t_wrcs;
+	double Tini;
+	double wrcs_coefficient;
+	double wrcs_p0;
+	double sm_coefficient; 
 	// Dual Richards transfer coefficient  YD
 	double transfer_coefficient;
 	// double unsaturated_hydraulic_conductivity;

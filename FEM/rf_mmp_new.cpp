@@ -127,6 +127,7 @@ CMediumProperties::CMediumProperties() : geo_dimension(0), _mesh(NULL), _geo_typ
 	graindiameter = 0; // CB Chiogna et al alpha-t model
 	hydraulicrad = 0;
 	betaexpo = 0;
+	t_wrcs = false; //XW 082014
 	ElementVolumeMultiplyer = 1.0; // SB / JOD 2014-11-10
 
 	permeability_pressure_model = -1; // 01.09.2011. WW
@@ -146,6 +147,7 @@ CMediumProperties::CMediumProperties() : geo_dimension(0), _mesh(NULL), _geo_typ
 	storage_effstress_model = 0;
 	permeability_effstress_model = 0;
 	evaporation = -1;
+	twrcs_model=-1;//XW Tdependnet Water retention
 }
 
 /**************************************************************************
@@ -1623,6 +1625,19 @@ std::ios::pos_type CMediumProperties::Read(std::ifstream* mmp_file)
 			continue;
 		}
 		//....................................................................
+		//Keyword for T dependent water retention Curve XW 082014
+		if(line_string.find("$TWRCS") != std::string::npos)
+		{
+			t_wrcs = true;
+			in.str(GetLineFromFile1(mmp_file));
+			in >> twrcs_model;
+			in >> Tini;
+			in >> wrcs_coefficient;
+			in >> sm_coefficient;
+			in >> wrcs_p0;
+			in.clear();
+			continue;
+		}
 		// Dual Richards
 		if (line_string.find("$SPECIFIC_STORAGE") != std::string::npos)
 		{
@@ -4596,6 +4611,12 @@ double CMediumProperties::PermeabilityFunctionPressure(long /*index*/, double PG
 	// WX: permeability as function of gas pressure. 11.05.2010
 	switch (permeability_pressure_model)
 	{
+		case 9: //XW permeability water pressure dependency only for multi_phase_flow
+			if (m_pcs->getProcessType() == FiniteElement::MULTI_PHASE_FLOW)
+			//WX: now it's only works for Multi_Phase_Flow. 05.2010
+			fac_perm_pressure = GetCurveValue((int) permeability_pressure_model_values[0], 0, PG2,
+						&gueltig);
+		break;
 		case 10: // WX: case 10, factor directly calculated from curve. 05.2010
 			if (m_pcs->getProcessType() == FiniteElement::MULTI_PHASE_FLOW)
 				// WX: now it's only works for Multi_Phase_Flow. 05.2010
@@ -5058,6 +5079,13 @@ double CMediumProperties::PressureSaturationDependency(const double wetting_satu
 			// Convert alpha to entry pressure?
 			if (entry_pressure_conversion)
 				pb = (mfp_vector[0]->Density() * 9.81) / pb;
+			switch (twrcs_model)//XW 082014 add t dependent WRCS
+			{
+			case 1:
+				m+=Fem_Ele_Std->Tdepenwrcs();
+				slm+=Fem_Ele_Std->Tdepensm();
+				break;
+			}
 			//
 			// Get dPc/dSw
 			v1 = pow(((sl - slr) / (slm - slr)), (-1.0 / m));

@@ -189,6 +189,7 @@ CFiniteElementVec::CFiniteElementVec(process::CRFProcessDeformation* dm_pcs, con
 			Disp = new double[18];
 			Temp = new double[9];
 			T1 = new double[9];
+			Tem_pc = new double[9]; // XW
 
 			Sxx = new double[9];
 			Syy = new double[9];
@@ -224,6 +225,7 @@ CFiniteElementVec::CFiniteElementVec(process::CRFProcessDeformation* dm_pcs, con
 			Disp = new double[60];
 			Temp = new double[20];
 			T1 = new double[20];
+			Tem_pc = new double[20]; // XW
 
 			Sxx = new double[20];
 			Syy = new double[20];
@@ -2204,7 +2206,7 @@ void CFiniteElementVec::GlobalAssembly_RHS()
 		   }
 		 */
 		//
-		if (PoroModel == 4 || T_Flag || smat->Creep_mode > 0)
+		if (PoroModel == 4 || T_Flag || smat->Creep_mode > 0 || smat->SwellingPressureType == 5)//XW add swelling type = 5)
 			Strain_TCS = true;
 		//
 		if (smat->CreepModel() == 1000) // HL_ODS
@@ -2428,6 +2430,28 @@ void CFiniteElementVec::GlobalAssembly_RHS()
 					for (i = 0; i < ns; i++)
 						stress_ne[i] = (*eleV_DM->Stress)(i, gp);
 					smat->AddStain_by_HL_ODS(eleV_DM, stress_ne, strain_ne, t1);
+				}
+							// XW volumetric Swelling_Strain: 06.2013 */
+				if (smat->SwellingPressureType == 5) //XW FEe volumetric Swelling_Strain
+				{
+					Tempc = 0.0;
+					for(int i=0; i<nnodes; i++)
+					{
+						switch (Flow_Type)
+						{
+						case 1:
+							Tem_pc[i] = Max((- h_pcs->GetNodeValue(nodes[i],idx_P1)),0.0) - Max((- h_pcs->GetNodeValue(nodes[i],idx_P1_0)),0.0);
+							Tempc += shapefct[i] * Tem_pc[i];
+							break;
+						case 2:
+							Tem_pc[i] = h_pcs->GetNodeValue(nodes[i],idx_P1)- h_pcs->GetNodeValue(nodes[i],idx_P1_0);
+							Tempc += shapefct[i] * Tem_pc[i];
+							break;
+						}
+			  }
+				 //strain_ne[i] += smat-> SwellingCof * Tempc;}XW_Test
+					for (i = 0; i < 3; i++)
+						strain_ne[i] += smat-> SwellingCof * Tempc;
 				}
 				// Stress deduced by thermal or swelling strain incremental:
 				De->multi(strain_ne, dstress);

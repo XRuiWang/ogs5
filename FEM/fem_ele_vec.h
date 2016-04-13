@@ -188,8 +188,9 @@ private:
 	double *Temp, Tem;
 	double* T1;
 	double S_Water;
-
-	// Element value
+    //suction of nodes XW
+	double* Tem_pc, Tempc; //XW 06.2013
+	//Element value
 	ElementValue_DM* eleV_DM;
 
 	//------ Enhanced element ------

@@ -81,6 +81,7 @@ public:
 	 * @return
 	 */
 	double getReferenceTemperature() const { return T_0; }
+	double WaterThermExpansion (double T);//XW 06.2013
 	std::ios::pos_type Read(std::ifstream*);
 	void Write(std::ofstream*) const;
 	void CalPrimaryVariable(std::vector<std::string>& pcs_name_vector);
@@ -130,7 +131,7 @@ private:
 	long node; // OK4704
 	// Density
 	int density_model;
-
+	int thermalexpansion_model;//XW 06.2013 for alphaw^(T)
 	// TF 11/2011 - used only in read- and write-method
 	int density_curve_number, viscosity_curve_number; // JOD 2014-11-10
 
@@ -174,6 +175,7 @@ private:
 	std::vector<CompProperties*> component_vector;
 
 	bool drho_dT_unsaturated;
+	bool drohw_dT_multi; //XW
 
 	double specific_heat_source;
 
@@ -199,6 +201,18 @@ private:
 	 * density deviated with respect to the temperature
 	 */
 	double drho_dT;
+
+	double drhw_dT; //XW variable thermal-expansion
+    double a1;
+	double a2;
+	double a3;
+	double a4;
+	double a5;
+	double a6;
+	double a7;
+	/**
+	 *XW for case 2 ThermalExpansion
+	 */
 	/**
 	 * density deviated with respect to the concentration
 	 */
@@ -206,6 +220,10 @@ private:
 
 	double diffusion; /*SB:2p */
 	double diffusion_coef; // AKS
+	double curvnr;// XW water density curve
+	double therm_ex_curv_nr;// XW 06.2013 for alphaw^(T)
+	double dens_curv_nr; // XW 06.2013 for FEe
+
 	// Viscosity
 	double viscosity;
 	double viscosity0;
@@ -216,6 +234,8 @@ private:
 	double dmy_dp;
 	double dmy_dT;
 	double dmy_dC;
+	double my_a;// XW for new my^(T) model
+        double my_b;// XW for new my^(T) model
 	// Multi_componential flow
 	int decay_model, isotherm_model;
 	double rho[4], mu[4], cp[4], kappa[4], lambda[4], Kd[4], D0[4], alpha_T[4], beta_p[4];
