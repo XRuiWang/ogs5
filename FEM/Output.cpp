@@ -1688,8 +1688,8 @@ double COutput::NODWritePLYDataTEC(int number)
 		tec_file << " ZONE T=\"TIME=" << _time << "\""
 		         << "\n";
 
-	tec_file << " ZONE T=\"TIME=" << _time << "\""
-	         << "\n";
+	//tec_file << " ZONE T=\"TIME=" << _time << "\""
+	        // << "\n"; XW_del
 	//----------------------------------------------------------------------
 	// Write data
 	//======================================================================
