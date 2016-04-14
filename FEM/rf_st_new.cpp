@@ -1853,6 +1853,8 @@ void CSourceTerm::FaceIntegration(CFEMesh* msh, std::vector<long> const& nodes_o
 		elem = msh->ele_vector[vec_possible_elements[i]];
 		if (!elem->GetMark())
 			continue;
+		if(elem->GetDimension() != 3) // XW for add sourceterm on the 2D/3D mixtured BC
+			continue;
 		nfaces = elem->GetFacesNumber();
 		elem->SetOrder(msh->getOrder());
 		for (j = 0; j < nfaces; j++)
