@@ -92,9 +92,11 @@ last modification:
 **************************************************************************/
 void CNodeValue::Read(std::istream& is)
 {
+	int curve_type;//XW add curve_value
 	is >> geo_node_number;
 	is >> msh_node_number;
 	is >> CurveIndex;
+	is >> curve_type;//XW_Test 082014
 	is >> node_value;
 	/*
 	// This is for river flow

@@ -558,7 +558,85 @@ void CRFProcess::AllocateMemGPoint()
 	for (size_t i = 0; i < mesh_ele_vector_size; i++)
 		ele_gp_value.push_back(new ElementValue(this, m_msh->ele_vector[i]));
 }
+/**************************************************************************
+   FEMLib-Method:
+   Task:    This function is a part of the monolithic scheme
+         and it is used to assign pcs name to IC, ST, BC, TIM and OUT. object 
+		 in case that the process names of flow and deformation processes are
+		 given individually, i.e. not like DEFORMATION_FLOW or DEFORMATION_H2
+   Programing:
+   07/2005 WW Implementation
+   10/2010 TF cody style improvements
+**************************************************************************/
+void CRFProcess::SetOBJNames()
+{
+	// IC
+	const size_t ic_vector_size(ic_vector.size());
+	for (size_t i = 0; i < ic_vector_size; i++)
+		//ic_vector[i]->setProcessType(this->getProcessType()); XW_072015
+	{
+		const FiniteElement::ProcessType mono_pcs_type = ic_vector[i]->getProcessType();
+		if(    mono_pcs_type == FiniteElement::LIQUID_FLOW
+			|| mono_pcs_type == FiniteElement::MULTI_PHASE_FLOW
+			|| mono_pcs_type == FiniteElement::DEFORMATION)
+			ic_vector[i]->setProcessType(this->getProcessType());
+	}//XW_072015
+	// BC
+	std::list<CBoundaryCondition*>::const_iterator p_bc = bc_list.begin();
+	while (p_bc != bc_list.end())
+	{
+		//(*p_bc)->setProcessType(this->getProcessType()); XW_072015
+		const FiniteElement::ProcessType mono_pcs_type = (*p_bc)->getProcessType();
+		if(    mono_pcs_type == FiniteElement::LIQUID_FLOW
+			|| mono_pcs_type == FiniteElement::MULTI_PHASE_FLOW
+			|| mono_pcs_type == FiniteElement::DEFORMATION)
+			(*p_bc)->setProcessType(this->getProcessType());
 
+		++p_bc;
+	}
+
+	// ST
+	const size_t st_vector_size (st_vector.size());
+	for (size_t i = 0; i < st_vector_size; i++)
+		//st_vector[i]->setProcessType(this->getProcessType()); XW_072015
+	{
+		const FiniteElement::ProcessType mono_pcs_type = st_vector[i]->getProcessType();
+		if(    mono_pcs_type == FiniteElement::LIQUID_FLOW
+			|| mono_pcs_type == FiniteElement::MULTI_PHASE_FLOW
+			|| mono_pcs_type == FiniteElement::DEFORMATION)
+			st_vector[i]->setProcessType(this->getProcessType());
+	}//XW_072015
+	// TIM
+	const size_t time_vector_size (time_vector.size());
+	for (size_t i = 0; i < time_vector_size; i++)
+		//		Tim = time_vector[i];
+		//		Tim->pcs_type_name = _pcs_type_name;
+	//	time_vector[i]->pcs_type_name = convertProcessTypeToString (this->getProcessType());
+	{
+		const FiniteElement::ProcessType mono_pcs_type
+			= FiniteElement::convertProcessType(time_vector[i]->getProcessName());
+		if(    mono_pcs_type == FiniteElement::LIQUID_FLOW
+			|| mono_pcs_type == FiniteElement::MULTI_PHASE_FLOW
+			|| mono_pcs_type == FiniteElement::DEFORMATION)
+			time_vector[i]->pcs_type_name = convertProcessTypeToString (this->getProcessType());
+	}//XW_072015
+	// OUT
+	// OK4216
+	const size_t out_vector_size (out_vector.size());
+	for (size_t i = 0; i < out_vector_size; i++)
+		//		m_out = out_vector[i];
+		//		m_out->_pcs_type_name = _pcs_type_name;
+		//out_vector[i]->setProcessType(this->getProcessType());
+	//m_out->pcs_pv_name = pcs_primary_function_name[0];//CMCD
+	//string temp = pcs_primary_function_name[0];
+	{
+		const FiniteElement::ProcessType mono_pcs_type = out_vector[i]->getProcessType();
+		if(    mono_pcs_type == FiniteElement::LIQUID_FLOW
+			|| mono_pcs_type == FiniteElement::MULTI_PHASE_FLOW
+			|| mono_pcs_type == FiniteElement::DEFORMATION)
+			out_vector[i]->setProcessType(this->getProcessType());
+	}
+}
 /**************************************************************************
    PCSLib-Method:
    10/2002 OK Implementation
@@ -942,6 +1020,7 @@ void CRFProcess::Create()
 		cout << "Reloading the primary variables... "
 		     << "\n";
 		ReadSolution(); // WW
+		SetIC();//XW temp for backfill 30072014
 	}
 
 	if (reload < 2) // PCH: If reload is set, no need to have ICs
@@ -3127,6 +3206,8 @@ void CRFProcess::ConfigDeformation()
 		norm_u_JFNK = new double[2];
 #endif
 	}
+	if(type / 10 == 4)
+		SetOBJNames();     // XW_add
 }
 
 /**************************************************************************

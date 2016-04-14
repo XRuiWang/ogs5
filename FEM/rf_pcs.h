@@ -732,6 +732,7 @@ public:
 	void setidxVx(int index) { _idxVx = index; }
 	void setidxVy(int index) { _idxVy = index; }
 	void setidxVz(int index) { _idxVz = index; }
+	void SetOBJNames(); // XW_test
 	// ST
 	void IncorporateSourceTerms(const int rank = -1);
 // WW void CheckSTGroup(); //OK

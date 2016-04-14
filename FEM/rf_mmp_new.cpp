@@ -2719,7 +2719,8 @@ double* CMediumProperties::HeatConductivityTensor(int number)
 				heat_conductivity_fluids = Fem_Ele_Std->FluidProp->HeatConductivity();
 			Sw = 1;
 
-			if (cpl_pcs && cpl_pcs->type != 1)
+			//if (cpl_pcs && cpl_pcs->type != 1) XW del 
+			if (! (cpl_pcs && cpl_pcs->type == 1 || cpl_pcs && cpl_pcs->type == 41)) // XW_072015
 			{
 				double PG = Fem_Ele_Std->interpolate(Fem_Ele_Std->NodalValC1); // Capillary pressure
 

@@ -799,6 +799,10 @@ void CFiniteElementStd::ConfigureCoupling(CRFProcess* pcs, const int* Shift, boo
 				if (cpl_pcs == NULL) // 23.02.2009 NB 4.9.05
 
 					cpl_pcs = PCSGet("AIR_FLOW"); // 23.01.2009 NB
+				if(cpl_pcs == NULL) //WW__XW 072015
+				{
+				cpl_pcs = PCSGet("DEFORMATION_FLOW");
+				}//WW__XW 072015
 
 				if (cpl_pcs) // MX
 				{

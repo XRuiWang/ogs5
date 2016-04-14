@@ -165,6 +165,10 @@ public:
 	// Dynamic time control methods JT2012
 	bool isDynamicTimeFailureSuggested(CRFProcess* this_pcs = NULL);
 //
+	std::string getProcessName() const
+	{
+		return pcs_type_name;
+	}//XW_072015
 #ifdef GEM_REACT
 	double MaxTimeStep();
 #endif
