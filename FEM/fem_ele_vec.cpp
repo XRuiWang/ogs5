@@ -2206,7 +2206,7 @@ void CFiniteElementVec::GlobalAssembly_RHS()
 		   }
 		 */
 		//
-		if (PoroModel == 4 || T_Flag || smat->Creep_mode > 0 || smat->SwellingPressureType == 5)//XW add swelling type = 5)
+		if (PoroModel == 4 || T_Flag || smat->Creep_mode > 0 || smat->SwellingPressureType == 5 || smat->SwellingPressureType == 6)//XW add swelling type = 5/6)
 			Strain_TCS = true;
 		//
 		if (smat->CreepModel() == 1000) // HL_ODS
