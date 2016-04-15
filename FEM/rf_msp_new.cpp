@@ -112,6 +112,12 @@ std::ios::pos_type CSolidProperties::Read(std::ifstream* msp_file)
 				in_sd >> Max_SwellingPressure;
 				in_sd.clear();
 			}
+			else if (SwellingPressureType == 5)//XW add volumetric Swellingstrain  06.2013 input linear_Swellingcoeffcient =1/3*Volumentric
+				{
+					in_sd >> SwellingCof;
+					//in_sd >> AnisoCof; 
+					in_sd.clear();
+				}
 			// 10.03.2008 WW
 			else if (SwellingPressureType == 3 || SwellingPressureType == 4)
 			{
@@ -131,13 +137,7 @@ std::ios::pos_type CSolidProperties::Read(std::ifstream* msp_file)
 					else if (SwellingPressureType == 4)
 						in_sd >> (*data_Youngs)(0) >> (*data_Youngs)(1) >> (*data_Youngs)(2);
 					in_sd.clear();
-				}
-				else if (SwellingPressureType == 5)//XW add volumetric Swellingstrain  06.2013 input linear_Swellingcoeffcient =1/3*Volumentric
-				{
-					in_sd >> SwellingCof;
-					//in_sd >> AnisoCof; 
-					in_sd.clear();
-				}
+				}		
 				else
 				{
 					std::cout << "No multi-phase flow coupled. The thermal elatic model can only be used in H2 coupled "
