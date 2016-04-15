@@ -118,6 +118,12 @@ std::ios::pos_type CSolidProperties::Read(std::ifstream* msp_file)
 					//in_sd >> AnisoCof; 
 					in_sd.clear();
 				}
+			else if (SwellingPressureType == 6)//XW add anisotropic Swellingstrain  
+				{
+					in_sd >> SwellingCof;
+					in_sd >> AnisoCof; 
+					in_sd.clear();
+				}
 			// 10.03.2008 WW
 			else if (SwellingPressureType == 3 || SwellingPressureType == 4)
 			{

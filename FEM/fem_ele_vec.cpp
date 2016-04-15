@@ -2453,6 +2453,29 @@ void CFiniteElementVec::GlobalAssembly_RHS()
 					for (i = 0; i < 3; i++)
 						strain_ne[i] += smat-> SwellingCof * Tempc;
 				}
+				if (smat->SwellingPressureType == 6) //XW anisotropic strain
+				{
+					Tempc = 0.0;
+					for(int i=0; i<nnodes; i++)
+					{
+						switch (Flow_Type)
+						{
+						case 1:
+							Tem_pc[i] = Max((- h_pcs->GetNodeValue(nodes[i],idx_P1)),0.0) - Max((- h_pcs->GetNodeValue(nodes[i],idx_P1_0)),0.0);
+							Tempc += shapefct[i] * Tem_pc[i];
+							break;
+						case 2:
+							Tem_pc[i] = h_pcs->GetNodeValue(nodes[i],idx_P1)- h_pcs->GetNodeValue(nodes[i],idx_P1_0);
+							Tempc += shapefct[i] * Tem_pc[i];
+							break;
+						}
+			  }
+			 // {for (i = 0; i < 3; i++) // JT: This was commented. SHOULDN'T BE!
+				 //strain_ne[i] += smat-> SwellingCof * Tempc;}XW_Test
+					for (i = 0; i < 2; i++)
+						strain_ne[i] += smat-> SwellingCof * Tempc *smat-> AnisoCof;
+						strain_ne[2] += smat-> SwellingCof * Tempc;
+				}
 				// Stress deduced by thermal or swelling strain incremental:
 				De->multi(strain_ne, dstress);
 				for (i = 0; i < ns; i++) // JT: This was commented. It shouldn't be.
