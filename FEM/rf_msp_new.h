@@ -185,6 +185,7 @@ private:
 	// Swelling pressure
 	int SwellingPressureType;
 	double SwellingCof;  //XW 06.2013
+	double AnisoCof; //XW ratio
 	double Max_SwellingPressure;
 	//
 	std::string CurveVariable_Conductivity;
