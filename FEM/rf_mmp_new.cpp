@@ -4921,6 +4921,13 @@ double CMediumProperties::SaturationCapillaryPressureFunction(const double capil
 			if (entry_pressure_conversion)
 				pb = (mfp_vector[0]->Density() * 9.81) / pb;
 			//
+			switch (twrcs_model)//XW 082014 add t dependent WRCS
+			{
+			case 1:
+				m+=Fem_Ele_Std->Tdepenwrcs();
+				slm+=Fem_Ele_Std->Tdepensm();
+					break;
+			}
 			if (pc < 0.0)
 				pc = 0.0;
 			se = pow(pc / pb, 1.0 / (1.0 - m)) + 1.0;
